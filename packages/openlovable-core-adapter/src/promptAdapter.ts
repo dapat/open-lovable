@@ -1,6 +1,7 @@
 import { PageSpec } from './spec'
 import { renderLegacyHTML } from './render'
 import { renderThemedHTML } from './renderThemed'
+import { getPreset, applyPresetToSpec, ThemeName } from './presets'
 
 /**
  * Stub LLM adapter: map any prompt to a deterministic PageSpec.
@@ -80,22 +81,71 @@ export async function promptToSpec(prompt: string): Promise<PageSpec> {
   return spec
 }
 
+// === New: detect Theme from prompt keywords
+export function detectThemeFromPrompt(prompt: string): ThemeName | null {
+  const p = (prompt || '').toLowerCase()
+  if (/(playful|fun|vibrant|friendly|cute|kid|kids|youth)/.test(p)) return 'playful'
+  if (/(elegant|sleek|refined|sophisticated|lux|premium)/.test(p)) return 'elegant'
+  if (/(cyber|neon|matrix|hacker|terminal|green on black|futuristic)/.test(p)) return 'cyber'
+  if (/(pastel|soft color|soft-colou?r|mint|peach|lavender)/.test(p)) return 'pastel'
+  if (/(newspaper|editorial|monochrome|print|press|headline|serif)/.test(p)) return 'newspaper'
+  if (/(glassmorphism|neon glass|glass|frosted|blur|glassy)/.test(p)) return 'neon-glass'
+  if (/(minimal|minimalist|simple|clean)/.test(p)) return 'minimal'
+  return null
+}
+
+// Overload signatures for backward compatibility
+export async function generateFromPrompt(
+  prompt: string,
+  seed?: number,
+  theme?: 'minimal' | 'playful' | 'elegant' | 'cyber'
+): Promise<{ spec: any; html: string; seed: number; chosenTheme?: ThemeName; themeSource?: 'prompt' | 'explicit' | 'none' }>
+
 export async function generateFromPrompt(
   prompt: string,
   seed?: number,
   theme?: 'minimal' | 'playful' | 'elegant' | 'cyber',
-  themeTokens?: { accent?: string; radius?: string; font?: 'system' | 'inter' | 'serif' }
+  themeTokens?: { accent?: string; radius?: string; font?: 'system' | 'inter' | 'serif' },
+  autoStyle?: boolean
+): Promise<{ spec: any; html: string; seed: number; chosenTheme?: ThemeName; themeSource?: 'prompt' | 'explicit' | 'none' }>
+
+export async function generateFromPrompt(
+  prompt: string,
+  seed?: number,
+  themeOrUndefined?: any,
+  themeTokensOrUndefined?: any,
+  autoStyleOrUndefined?: any
 ) {
   const spec = await promptToSpec(prompt)
 
   const actualSeed = typeof seed === 'number' && Number.isFinite(seed) ? seed : Math.floor(Math.random() * 100000)
   const hasSeed = typeof seed === 'number' && Number.isFinite(seed)
-  
-  if (theme) {
-    ;(spec as any).theme = theme
-  }
-  if (themeTokens) {
-    ;(spec as any).themeTokens = themeTokens
+
+  const explicitTheme = themeOrUndefined as ThemeName | undefined
+  const explicitTokens = themeTokensOrUndefined as { accent?: string; radius?: string; font?: any } | undefined
+  const autoStyle = typeof autoStyleOrUndefined === 'boolean' ? autoStyleOrUndefined : true
+
+  let chosenTheme: ThemeName | undefined
+  let themeSource: 'prompt' | 'explicit' | 'none' = 'none'
+
+  if (explicitTheme) {
+    ;(spec as any).theme = explicitTheme
+    if (explicitTokens) {
+      ;(spec as any).themeTokens = { ...(spec as any).themeTokens, ...explicitTokens }
+    }
+    chosenTheme = explicitTheme
+    themeSource = 'explicit'
+  } else if (autoStyle) {
+    const detected = detectThemeFromPrompt(prompt)
+    if (detected) {
+      const preset = getPreset(detected)
+      if (preset) {
+        const s2 = applyPresetToSpec(spec, preset)
+        Object.assign(spec, s2)
+        chosenTheme = detected
+        themeSource = 'prompt'
+      }
+    }
   }
 
   if (hasSeed) {
@@ -109,9 +159,8 @@ export async function generateFromPrompt(
     } catch {}
   }
 
-  // Use themed renderer only when theme is explicitly provided; otherwise keep legacy for golden compatibility
-  const html = theme ? renderThemedHTML(spec) : renderLegacyHTML(spec)
-  return { spec, html, seed: actualSeed }
+  const html = (spec as any).theme ? renderThemedHTML(spec) : renderLegacyHTML(spec)
+  return { spec, html, seed: actualSeed, chosenTheme, themeSource }
 }
 
 // --- deterministic PRNG (mulberry32)
