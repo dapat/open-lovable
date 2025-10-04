@@ -1,0 +1,27 @@
+{
+  "name": "flowgami-root",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Monorepo for apps and packages",
+  "license": "MIT",
+  "scripts": {
+    "dev": "pnpm --filter demo dev",
+    "build": "pnpm -r build",
+    "test": "vitest run",
+    "postinstall": "node tools/write-core-version.mjs",
+    "snap:update": "vitest -u"
+  },
+  "devDependencies": {
+    "@types/node": "^24.6.2",
+    "eslint": "^9.36.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4",
+    "@flowgami/openlovable-core-adapter": "workspace:*",
+    "jszip": "^3.10.1"
+  },
+  "dependencies": {
+    "jszip": "^3.10.1"
+  }
+}

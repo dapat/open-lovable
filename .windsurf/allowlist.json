@@ -1,0 +1,138 @@
+{
+  "commandAllowlist": [
+    {
+      "pattern": "pnpm --version",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ตรวจเวอร์ชัน pnpm"
+    },
+    {
+      "pattern": "node --version",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ตรวจเวอร์ชัน node"
+    },
+    {
+      "pattern": "npm --version",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ตรวจเวอร์ชัน npm"
+    },
+    {
+      "pattern": "git --version",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ตรวจเวอร์ชัน git"
+    },
+    {
+      "pattern": "git status",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ดูสถานะ git ปัจจุบัน"
+    },
+    {
+      "pattern": "git submodule status",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ดูสถานะ submodule"
+    },
+    {
+      "pattern": "ls -la",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "สำรวจไฟล์และโฟลเดอร์"
+    },
+    {
+      "pattern": "curl -s http://localhost:3001/api/health",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ตรวจ Health API"
+    },
+    {
+      "pattern": "/bin/zsh -lc 'curl -s http://localhost:3001/api/health'",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "(shell-wrapped) ตรวจ Health API"
+    },
+    {
+      "pattern": "curl -s 'http://localhost:3001/api/preview?example=true'",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "พรีวิว HTML จากตัวอย่าง spec"
+    },
+
+    {
+      "pattern": "pnpm install",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "ติดตั้ง deps และรัน postinstall (เขียน CORE_VERSION)"
+    },
+    {
+      "pattern": "pnpm dev",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "สตาร์ท Next dev server ที่พอร์ต 3001"
+    },
+    {
+      "pattern": "/bin/zsh -lc 'pnpm dev'",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "(shell-wrapped) สตาร์ท Next dev server ที่พอร์ต 3001"
+    },
+    {
+      "pattern": "pnpm test",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "รัน Vitest ที่ root"
+    },
+    {
+      "pattern": "/bin/zsh -lc 'pnpm test'",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "(shell-wrapped) รัน Vitest ที่ root"
+    },
+    {
+      "pattern": "pnpm -r build",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "บิลด์ทุก workspace"
+    },
+    {
+      "pattern": "/bin/zsh -lc 'pnpm -r build'",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "(shell-wrapped) บิลด์ทุก workspace"
+    },
+    {
+      "pattern": "pnpm --filter demo dev",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "สตาร์ท dev เฉพาะ demo"
+    },
+    {
+      "pattern": "pnpm -F @flowgami/openlovable-core-adapter add zod",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": true,
+      "description": "เพิ่ม zod เข้า adapter (เมื่อจำเป็น)"
+    },
+
+    {
+      "pattern": "git submodule update --remote --merge packages/openlovable-core",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": false,
+      "description": "อัปเดต submodule core ตาม upstream (ต้องตรวจเทสต์/preview ก่อน commit)"
+    },
+    {
+      "pattern": "git add packages/openlovable-core",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": false,
+      "description": "เตรียม staged submodule pointer เพื่อ commit"
+    },
+    {
+      "pattern": "git commit -m *openlovable core*",
+      "cwd": "/Users/pat/Projects/prompt-to-ui",
+      "autoRun": false,
+      "description": "commit การอัปเดต/pin submodule (ควรมีป้าย core-update)"
+    }
+  ]
+}

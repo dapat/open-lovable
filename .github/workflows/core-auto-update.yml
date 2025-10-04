@@ -1,0 +1,86 @@
+name: Core Auto Update
+
+on:
+  schedule:
+    - cron: "0 7 1 * *" # ทุกวันที่ 1 เวลา 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install pnpm
+        run: npm i -g pnpm@9
+
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+
+      # ---- Archon: mark doing (ใช้ run_id) ----
+      - name: Archon: mark monthly core update as doing
+        if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+        continue-on-error: true
+        env:
+          ARCHON_URL: ${{ secrets.ARCHON_URL }}
+          ARCHON_TOKEN: ${{ secrets.ARCHON_TOKEN }}
+        run: |
+          node tools/archon-task.mjs update \
+            --externalId "ops/core-update-${{ github.run_id }}" \
+            --status doing
+
+      - name: Update submodule (openlovable-core)
+        run: |
+          git submodule update --init --remote --merge packages/openlovable-core
+          git status --porcelain
+
+      - name: Commit changes if any
+        run: |
+          if ! git diff --quiet; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add packages/openlovable-core
+            git commit -m "chore(core): monthly auto-update openlovable-core submodule"
+          fi
+
+      # สร้าง PR ด้วย branch ฝัง run_id ไว้ — จะช่วยให้ฝั่ง close ดึง run_id ออกมาได้
+      - name: Create Pull Request
+        id: cpr
+        uses: peter-evans/create-pull-request@v6
+        with:
+          branch: chore/core-auto-update-${{ github.run_id }}
+          commit-message: "chore(core): monthly auto-update openlovable-core submodule"
+          title: "chore(core): monthly auto-update openlovable-core submodule"
+          body: |
+            Automated monthly update for `packages/openlovable-core` .
+
+            ExternalId: ops/core-update-${{ github.run_id }}
+
+            - Ran: `git submodule update --init --remote --merge packages/openlovable-core` 
+            - Please verify preview and tests.
+            - This PR is labeled to satisfy Core Guard.
+          labels: core-update, dependencies, automated pr
+          assignees: ${{ github.actor }}
+          signoff: false
+
+      # ---- Archon: move to review เมื่อ PR ถูกเปิด (ใช้ run_id เดิม) ----
+      - name: Archon: move task to review (PR opened)
+        if: ${{ steps.cpr.outputs.pull-request-number }}
+        continue-on-error: true
+        env:
+          ARCHON_URL: ${{ secrets.ARCHON_URL }}
+          ARCHON_TOKEN: ${{ secrets.ARCHON_TOKEN }}
+        run: |
+          node tools/archon-task.mjs update \
+            --externalId "ops/core-update-${{ github.run_id }}" \
+            --status review

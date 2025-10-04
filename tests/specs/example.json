@@ -1,0 +1,47 @@
+{
+  "title": "Flowgami Landing",
+  "subtitle": "This is a subtitle",
+  "accent": "#3b82f6",
+  "hero": {
+    "headline": "Build UIs from Specs",
+    "subheadline": "Turn structured specs into production-ready UI previews",
+    "ctaText": "Get Started"
+  },
+  "features": {
+    "title": "Features",
+    "items": [
+      "Zod-validated schema",
+      { "label": "Fast setup", "icon": "/icons/check.svg" },
+      "HTML preview rendering",
+      "Tailwind-based styling"
+    ]
+  },
+  "testimonials": {
+    "title": "What users say",
+    "items": [
+      { "quote": "This tool changed our workflow.", "author": "Jane", "avatar": "/avatars/jane.png" },
+      { "quote": "Fast and reliable." }
+    ]
+  },
+  "pricing": {
+    "title": "Choose your plan",
+    "plans": [
+      { "name": "Starter", "price": "$0", "features": ["1 project", "Community support"], "ctaText": "Start Free" },
+      { "name": "Pro", "price": "$19/mo", "features": ["Unlimited projects", "Priority support"], "ctaText": "Upgrade", "highlight": true }
+    ]
+  },
+  "faq": {
+    "title": "FAQ",
+    "items": [
+      { "q": "Can I export components?", "a": "Yes, Next.js and HTML zip are supported." },
+      { "q": "Can I bring my own design tokens?", "a": "Token mapping is planned." }
+    ]
+  },
+  "cta": {
+    "headline": "Ship faster with Flowgami",
+    "ctaText": "Try Now"
+  },
+  "footer": {
+    "smallprint": "© 2025 Flowgami. All rights reserved."
+  }
+}

@@ -1,0 +1,17 @@
+name: Core Guard
+
+on:
+  pull_request:
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+      - name: Check submodule update
+        run: |
+          git fetch origin ${{ github.base_ref }} --recurse-submodules
+          git diff --exit-code origin/${{ github.base_ref }}...HEAD -- packages/openlovable-core || \
+            (echo "❌ Submodule core updated. Add label 'core-update' to proceed." && exit 1)

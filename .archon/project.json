@@ -1,0 +1,24 @@
+{
+  "project_id": "cd36de68-36a4-4d86-b3eb-a44116491410",
+  "name": "Prompt-to-UI",
+  "description": "Spec-to-UI generator built on OpenLovable core, with Archon-first task loop (BMAD).",
+  "owner": "pat",
+  "created_at": "2025-10-03T00:00:00Z",
+  "archon_server": "http://localhost:3737",
+  "github_repo": "https://github.com/dapat/open-lovable",
+  "policies": {
+    "single_source_of_truth": true,
+    "guardrails": [
+      "no direct edits to packages/openlovable-core/**",
+      "tasks must bind project_id from this file",
+      "all releases require green tests and golden snapshot"
+    ]
+  },
+  "metadata": {
+    "language": "typescript",
+    "package_manager": "pnpm",
+    "framework": "Next.js",
+    "core_module": "openlovable-core (submodule)",
+    "demo_app": "apps/demo"
+  }
+}

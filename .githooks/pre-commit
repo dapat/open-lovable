@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Block commit if submodule packages/openlovable-core is dirty (+) or missing commit pointer
+if git submodule status | grep -E '^\+' >/dev/null 2>&1; then
+  echo "[pre-commit] ERROR: Submodule packages/openlovable-core has uncommitted changes (dirty)."
+  echo "Do NOT modify files under packages/openlovable-core/** directly."
+  echo "To update submodule, use: git submodule update --remote --merge packages/openlovable-core"
+  echo "Or pin to a specific SHA: (cd packages/openlovable-core && git checkout <sha>) && git add packages/openlovable-core"
+  exit 1
+fi
+
+# Additional guard: prevent staged changes inside core path
+if git diff --cached --name-only | grep -E '^packages/openlovable-core/' >/dev/null 2>&1; then
+  echo "[pre-commit] ERROR: Attempt to commit changes inside packages/openlovable-core/** is blocked (read-only)."
+  echo "Revert those changes or remove from index: git restore --staged packages/openlovable-core"
+  exit 1
+fi
+
+exit 0

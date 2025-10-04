@@ -1,0 +1,4 @@
+[submodule "packages/openlovable-core"]
+	path = packages/openlovable-core
+	url = https://github.com/firecrawl/open-lovable.git
+	branch = main
