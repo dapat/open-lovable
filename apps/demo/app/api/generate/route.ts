@@ -3,12 +3,12 @@ import { generateFromPrompt } from '@flowgami/openlovable-core-adapter'
 
 export async function POST(req: NextRequest) {
   try {
-    const { prompt, seed, theme, themeTokens, autoStyle } = await req.json()
+    const { prompt, seed, theme, themeTokens, autoStyle, styleMode, variationStrategy } = await req.json()
     const input = typeof prompt === 'string' && prompt.trim().length > 0 ? prompt : 'Landing page for AI Math SaaS for kids'
     const usedSeed = typeof seed === 'number' && Number.isFinite(seed) ? seed : undefined
-    const result = await generateFromPrompt(input, usedSeed, theme, themeTokens, autoStyle)
+    const result = await generateFromPrompt(input, usedSeed, theme, themeTokens, autoStyle, styleMode, variationStrategy)
     // Return the adapter's seed (may be randomly generated inside adapter)
-    return NextResponse.json(result, { status: 200 })
+    return NextResponse.json({ ...result, presetsVersion: result.presetsVersion }, { status: 200 })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: String(err?.message ?? err) }, { status: 400 })
   }
@@ -22,6 +22,8 @@ export async function GET(req: NextRequest) {
     const theme = url.searchParams.get('theme') as any
     const autoStyleParam = url.searchParams.get('autoStyle')
     const autoStyle = autoStyleParam == null ? true : autoStyleParam === 'true'
+    const styleMode = (url.searchParams.get('styleMode') as 'auto' | 'explicit' | 'seeded' | null) || undefined
+    const variationStrategy = url.searchParams.get('variationStrategy') as any
     const tokens = {
       accent: url.searchParams.get('accent') || undefined,
       radius: url.searchParams.get('radius') || undefined,
@@ -29,11 +31,10 @@ export async function GET(req: NextRequest) {
     }
     const seed = seedParam != null ? Number(seedParam) : undefined
     const usedSeed = typeof seed === 'number' && Number.isFinite(seed) ? seed : undefined
-    const result = await generateFromPrompt(q, usedSeed, theme, tokens, autoStyle)
+    const result = await generateFromPrompt(q, usedSeed, theme, tokens, autoStyle, styleMode, variationStrategy)
     // Return the adapter's seed (may be randomly generated inside adapter)
-    return NextResponse.json(result, { status: 200 })
+    return NextResponse.json({ ...result, presetsVersion: result.presetsVersion }, { status: 200 })
   } catch (err: any) {
     return NextResponse.json({ ok: false, error: String(err?.message ?? err) }, { status: 500 })
   }
 }
-

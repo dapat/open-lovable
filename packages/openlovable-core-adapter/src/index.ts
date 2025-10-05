@@ -7,6 +7,6 @@ export { renderThemedHTML } from './renderThemed'
 export { promptToSpec, generateFromPrompt, mulberry32, seededShuffle } from './promptAdapter'
 export { buildExportZip } from './exporter'
 export { parseBrandTokensFromHTML, getBrandTokensFromURL } from './brand'
-export { PRESETS, getPreset, applyPresetToSpec } from './presets'
+export { PRESETS, PRESETS_VERSION, getPreset, applyPresetToSpec } from './presets'
 export type { ThemePreset, ThemeName } from './presets'
 

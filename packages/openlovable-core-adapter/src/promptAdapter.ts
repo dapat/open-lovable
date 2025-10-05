@@ -1,7 +1,7 @@
 import { PageSpec } from './spec'
 import { renderLegacyHTML } from './render'
 import { renderThemedHTML } from './renderThemed'
-import { getPreset, applyPresetToSpec, ThemeName } from './presets'
+import { getPreset, applyPresetToSpec, ThemeName, PRESETS_VERSION } from './presets'
 
 /**
  * Stub LLM adapter: map any prompt to a deterministic PageSpec.
@@ -99,22 +99,26 @@ export async function generateFromPrompt(
   prompt: string,
   seed?: number,
   theme?: 'minimal' | 'playful' | 'elegant' | 'cyber'
-): Promise<{ spec: any; html: string; seed: number; chosenTheme?: ThemeName; themeSource?: 'prompt' | 'explicit' | 'none' }>
+): Promise<{ spec: any; html: string; seed: number; chosenTheme?: ThemeName; themeSource?: 'prompt' | 'explicit' | 'seeded' | 'none'; presetsVersion?: number }>
 
 export async function generateFromPrompt(
   prompt: string,
   seed?: number,
   theme?: 'minimal' | 'playful' | 'elegant' | 'cyber',
   themeTokens?: { accent?: string; radius?: string; font?: 'system' | 'inter' | 'serif' },
-  autoStyle?: boolean
-): Promise<{ spec: any; html: string; seed: number; chosenTheme?: ThemeName; themeSource?: 'prompt' | 'explicit' | 'none' }>
+  autoStyle?: boolean,
+  styleMode?: 'auto' | 'explicit' | 'seeded',
+  variationStrategy?: 'none' | 'reverse-features' | 'shuffle-pricing' | 'both'
+): Promise<{ spec: any; html: string; seed: number; chosenTheme?: ThemeName; themeSource?: 'prompt' | 'explicit' | 'seeded' | 'none'; presetsVersion?: number; variationStrategy?: 'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | 'auto' }>
 
 export async function generateFromPrompt(
   prompt: string,
   seed?: number,
   themeOrUndefined?: any,
   themeTokensOrUndefined?: any,
-  autoStyleOrUndefined?: any
+  autoStyleOrUndefined?: any,
+  styleModeOrUndefined?: any,
+  variationStrategyOrUndefined?: any
 ) {
   const spec = await promptToSpec(prompt)
 
@@ -122,45 +126,71 @@ export async function generateFromPrompt(
   const hasSeed = typeof seed === 'number' && Number.isFinite(seed)
 
   const explicitTheme = themeOrUndefined as ThemeName | undefined
-  const explicitTokens = themeTokensOrUndefined as { accent?: string; radius?: string; font?: any } | undefined
-  const autoStyle = typeof autoStyleOrUndefined === 'boolean' ? autoStyleOrUndefined : true
+  const explicitTokens = themeTokensOrUndefined as { accent?: string; radius?: string; font?: 'system' | 'inter' | 'serif' } | undefined
+  const autoStyle = !!autoStyleOrUndefined
+  const styleMode = (styleModeOrUndefined as 'auto' | 'explicit' | 'seeded' | undefined) ?? (autoStyle ? 'auto' : (explicitTheme || explicitTokens ? 'explicit' : 'none'))
 
   let chosenTheme: ThemeName | undefined
-  let themeSource: 'prompt' | 'explicit' | 'none' = 'none'
+  let themeSource: 'prompt' | 'explicit' | 'seeded' | 'none' = 'none'
 
-  if (explicitTheme) {
-    ;(spec as any).theme = explicitTheme
-    if (explicitTokens) {
-      ;(spec as any).themeTokens = { ...(spec as any).themeTokens, ...explicitTokens }
+  if (explicitTheme || explicitTokens) {
+    // treated as explicit or seeded based on styleMode
+    if (styleMode === 'seeded') {
+      themeSource = 'seeded'
+    } else {
+      themeSource = 'explicit'
     }
     chosenTheme = explicitTheme
-    themeSource = 'explicit'
-  } else if (autoStyle) {
+    if (explicitTheme) {
+      const p = getPreset(explicitTheme)
+      if (p) {
+        Object.assign((spec as any), applyPresetToSpec(spec, p))
+      } else {
+        (spec as any).theme = explicitTheme as any
+        ;(spec as any).themeTokens = { ...(spec as any).themeTokens, ...(explicitTokens || {}) } as any
+      }
+    } else if (explicitTokens) {
+      (spec as any).themeTokens = { ...(spec as any).themeTokens, ...explicitTokens } as any
+    }
+  } else if (autoStyle || styleMode === 'auto') {
     const detected = detectThemeFromPrompt(prompt)
+    chosenTheme = detected || undefined
     if (detected) {
-      const preset = getPreset(detected)
-      if (preset) {
-        const s2 = applyPresetToSpec(spec, preset)
-        Object.assign(spec, s2)
-        chosenTheme = detected
+      const p = getPreset(detected)
+      if (p) {
         themeSource = 'prompt'
+        Object.assign((spec as any), applyPresetToSpec(spec, p))
       }
     }
   }
 
-  if (hasSeed) {
-    try {
-      if (actualSeed % 2 === 0 && (spec as any).features?.items) {
-        ;(spec as any).features.items = [...(spec as any).features.items].reverse()
+  // Variation Strategy handling (T40)
+  let appliedStrategy: 'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | 'auto' = variationStrategyOrUndefined || 'auto'
+  try {
+    const feats = (spec as any).features?.items
+    const plans = (spec as any).pricing?.plans
+    if (appliedStrategy && appliedStrategy !== 'none') {
+      if ((appliedStrategy === 'reverse-features' || appliedStrategy === 'both') && feats) {
+        ;(spec as any).features.items = [...feats].reverse()
       }
-      if (actualSeed % 3 === 0 && (spec as any).pricing?.plans) {
-        ;(spec as any).pricing.plans = seededShuffle([...(spec as any).pricing.plans], actualSeed)
+      if ((appliedStrategy === 'shuffle-pricing' || appliedStrategy === 'both') && plans) {
+        ;(spec as any).pricing.plans = seededShuffle([...(plans)], actualSeed)
       }
-    } catch {}
-  }
+    } else if (!appliedStrategy) {
+      // Auto (seed-based) logic — keep prior behavior for reproducibility
+      if (hasSeed) {
+        if (actualSeed % 2 === 0 && feats) {
+          ;(spec as any).features.items = [...feats].reverse()
+        }
+        if (actualSeed % 3 === 0 && plans) {
+          ;(spec as any).pricing.plans = seededShuffle([...(plans)], actualSeed)
+        }
+      }
+    }
+  } catch {}
 
   const html = (spec as any).theme ? renderThemedHTML(spec) : renderLegacyHTML(spec)
-  return { spec, html, seed: actualSeed, chosenTheme, themeSource }
+  return { spec, html, seed: actualSeed, chosenTheme, themeSource, presetsVersion: PRESETS_VERSION, variationStrategy: appliedStrategy }
 }
 
 // --- deterministic PRNG (mulberry32)

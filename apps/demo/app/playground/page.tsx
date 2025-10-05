@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useEffect, useRef, useState } from 'react'
-import { PRESETS } from '@flowgami/openlovable-core-adapter'
+import { PRESETS, mulberry32 } from '@flowgami/openlovable-core-adapter'
 import { buildShareURL, parseQueryToState } from '../utils/urlState'
 
 const THEMES = ['minimal', 'playful', 'elegant', 'cyber'] as const
@@ -23,10 +23,12 @@ export default function PlaygroundPage() {
   const [brandUrl, setBrandUrl] = useState<string>('')
   // Auto-style from prompt
   const [autoStyle, setAutoStyle] = useState<boolean>(true)
+  const [styleMode, setStyleMode] = useState<'auto' | 'explicit' | 'seeded'>('auto')
   const [chosenTheme, setChosenTheme] = useState<string | undefined>(undefined)
   const [themeSource, setThemeSource] = useState<'prompt' | 'explicit' | 'none' | undefined>(undefined)
   const [variationStrategy, setVariationStrategy] = useState<'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | undefined>(undefined)
   const [appliedVariation, setAppliedVariation] = useState<'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | 'auto' | undefined>(undefined)
+  const [presetsVersion, setPresetsVersion] = useState<number | undefined>(undefined)
 
   function handleToggle(keyword: string) {
     if (!prompt.toLowerCase().includes(keyword.toLowerCase())) {
@@ -77,17 +79,33 @@ export default function PlaygroundPage() {
     setError('')
     setLoading(true)
     try {
+      // Resolve seed early so 'seeded' style can derive preset deterministically
+      const resolvedSeed = ((): number | undefined => {
+        if (typeof customSeed === 'number') return customSeed
+        if (typeof seed === 'number') return seed
+        return undefined
+      })()
+
       const payload: any = {
         prompt,
-        seed: customSeed ?? seed,
-        autoStyle,
+        seed: resolvedSeed,
+        autoStyle: styleMode === 'auto',
+        styleMode,
       }
-      if (!autoStyle) {
+      if (styleMode === 'explicit') {
         payload.theme = theme
         payload.themeTokens = { accent, radius: `${radius}px`, font }
-      }
-      if (variationStrategy) {
-        payload.variationStrategy = variationStrategy
+      } else if (styleMode === 'seeded') {
+        // Choose preset based on seed deterministically
+        const ensureSeed = resolvedSeed ?? Math.floor(Math.random() * 100000)
+        if (resolvedSeed == null) {
+          payload.seed = ensureSeed
+        }
+        const r = mulberry32(ensureSeed)()
+        const idx = Math.floor(r * PRESETS.length) % PRESETS.length
+        const p = PRESETS[idx]
+        payload.theme = p.theme
+        payload.themeTokens = p.themeTokens
       }
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -109,6 +127,20 @@ export default function PlaygroundPage() {
       setChosenTheme(data?.chosenTheme)
       setThemeSource(data?.themeSource)
       setAppliedVariation(data?.variationStrategy)
+      setPresetsVersion(typeof data?.presetsVersion === 'number' ? data.presetsVersion : undefined)
+      // Update URL to reflect current state so refresh/share stays in sync
+      try {
+        const nextUrl = buildShareURL(`${window.location.origin}/playground`, {
+          prompt,
+          seed: typeof data?.seed === 'number' ? data.seed : (customSeed ?? seed),
+          autoStyle: styleMode === 'auto',
+          styleMode,
+          theme: styleMode === 'explicit' ? (theme as any) : undefined,
+          themeTokens: styleMode === 'explicit' ? { accent, radius: `${radius}px`, font } : undefined,
+          variationStrategy,
+        })
+        window.history.replaceState(null, '', nextUrl)
+      } catch {}
     } catch (e: any) {
       setHtml('')
       setError(String(e.message || e))
@@ -127,13 +159,18 @@ export default function PlaygroundPage() {
     setError('')
     setExporting(true)
     try {
-      const exportPayload: any = { prompt, seed }
-      if (!autoStyle) {
+      const exportPayload: any = { prompt, seed, styleMode }
+      if (styleMode === 'explicit') {
         exportPayload.theme = theme
         exportPayload.themeTokens = { accent, radius: `${radius}px`, font }
-      }
-      if (variationStrategy) {
-        exportPayload.variationStrategy = variationStrategy
+      } else if (styleMode === 'seeded') {
+        const ensureSeed = typeof seed === 'number' ? seed : Math.floor(Math.random() * 100000)
+        if (typeof seed !== 'number') setSeed(ensureSeed)
+        const r = mulberry32(ensureSeed)()
+        const idx = Math.floor(r * PRESETS.length) % PRESETS.length
+        const p = PRESETS[idx]
+        exportPayload.theme = p.theme
+        exportPayload.themeTokens = p.themeTokens
       }
       const res = await fetch('/api/export', {
         method: 'POST',
@@ -174,6 +211,7 @@ export default function PlaygroundPage() {
       if (typeof st.prompt === 'string') setPrompt(st.prompt)
       if (typeof st.seed === 'number') setSeed(st.seed)
       if (typeof st.autoStyle === 'boolean') setAutoStyle(st.autoStyle)
+      if (st.styleMode) setStyleMode(st.styleMode)
       if (st.theme) setTheme(st.theme as any)
       if (st.themeTokens?.accent) setAccent(st.themeTokens.accent)
       if (st.themeTokens?.radius) {
@@ -247,12 +285,30 @@ export default function PlaygroundPage() {
               className="w-full p-2 border rounded"
               value={theme}
               onChange={(e) => setTheme(e.target.value as Theme)}
+              disabled={styleMode==='seeded'}
             >
               {THEMES.map((t) => (
                 <option key={t} value={t}>
                   {t.charAt(0).toUpperCase() + t.slice(1)}
                 </option>
               ))}
+            </select>
+          </div>
+          {/* Style Mode */}
+          <div className="min-w-48">
+            <label className="block text-sm mb-1 font-medium">Style Mode</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={styleMode}
+              onChange={(e) => {
+                const v = e.target.value as 'auto' | 'explicit' | 'seeded'
+                setStyleMode(v)
+                setAutoStyle(v === 'auto')
+              }}
+            >
+              <option value="auto">Auto from prompt</option>
+              <option value="explicit">Explicit (use selectors)</option>
+              <option value="seeded">Random by seed</option>
             </select>
           </div>
           {/* Variation Strategy */}
@@ -270,9 +326,13 @@ export default function PlaygroundPage() {
               <option value="both">Both</option>
             </select>
           </div>
-          {/* Auto style from prompt toggle */}
-          <div className="flex items-center gap-2 mt-6">
-            <input id="auto-style" type="checkbox" checked={autoStyle} onChange={(e)=>setAutoStyle(e.target.checked)} />
+          {/* Auto style toggle deprecated by Style Mode but kept for visibility */}
+          <div className="flex items-center gap-2 mt-6 opacity-60">
+            <input id="auto-style" type="checkbox" checked={styleMode==='auto'} onChange={(e)=>{
+              const on = e.target.checked
+              setStyleMode(on ? 'auto' : 'explicit')
+              setAutoStyle(on)
+            }} />
             <label htmlFor="auto-style" className="text-sm">Auto style from prompt</label>
           </div>
           <div className="min-w-40">
@@ -282,27 +342,29 @@ export default function PlaygroundPage() {
               className="w-full h-[40px] border rounded"
               value={accent}
               onChange={(e) => setAccent(e.target.value)}
+              disabled={styleMode==='seeded'}
               aria-label="Accent Color"
             />
           </div>
-          <div className="min-w-48">
+          <div className="min-w-40">
             <label className="block text-sm mb-1 font-medium">Radius: {radius}px</label>
             <input
               type="range"
               min={0}
               max={24}
+              className="w-48"
               value={radius}
               onChange={(e) => setRadius(Number(e.target.value))}
-              className="w-full"
-              aria-label="Border Radius"
+              disabled={styleMode==='seeded'}
             />
           </div>
-          <div className="min-w-48">
+          <div className="min-w-40">
             <label className="block text-sm mb-1 font-medium">Font</label>
             <select
               className="w-full p-2 border rounded"
               value={font}
               onChange={(e) => setFont(e.target.value as FontKey)}
+              disabled={styleMode==='seeded'}
             >
               {FONTS.map((f) => (
                 <option key={f} value={f}>
@@ -385,9 +447,10 @@ export default function PlaygroundPage() {
               const url = buildShareURL(`${window.location.origin}/playground`, {
                 prompt,
                 seed,
-                autoStyle,
-                theme: autoStyle ? undefined : (theme as any),
-                themeTokens: autoStyle ? undefined : { accent, radius: `${radius}px`, font },
+                autoStyle: styleMode === 'auto',
+                styleMode,
+                theme: styleMode === 'explicit' ? (theme as any) : undefined,
+                themeTokens: styleMode === 'explicit' ? { accent, radius: `${radius}px`, font } : undefined,
                 variationStrategy,
               })
               await navigator.clipboard.writeText(url)
@@ -414,10 +477,9 @@ export default function PlaygroundPage() {
           <p className="text-sm text-gray-600 mt-1">Seed: {seed}</p>
         )}
         {(chosenTheme || themeSource) && (
-          <p className="text-xs text-gray-600 mt-1">
-            Style: <span className="font-medium">{chosenTheme ?? '(none)'}</span>
-            {themeSource ? <><span className="mx-1">•</span> source: {themeSource}</> : null}
-            {appliedVariation ? <><span className="mx-1">•</span> variation: {appliedVariation}</> : null}
+          <p className="text-sm text-gray-600 mt-1">
+            Style: {chosenTheme ?? '(none)'} • source: {themeSource} • variation: {appliedVariation}
+            {typeof presetsVersion === 'number' ? ` • presets: v${presetsVersion}` : ''}
           </p>
         )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

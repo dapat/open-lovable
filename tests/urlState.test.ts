@@ -30,6 +30,18 @@ describe('urlState helpers', () => {
       themeTokens: { accent: '#0ea5e9', radius: '12px', font: 'serif' },
       variationStrategy: 'both',
     })
+
+  it('round-trip seeded styleMode with seed only', () => {
+    const q = encodeStateToQuery({ styleMode: 'seeded', seed: 123 })
+    expect(q).toContain('styleMode=seeded')
+    expect(q).toContain('seed=123')
+    const parsed = parseQueryToState(q)
+    expect(parsed.styleMode).toBe('seeded')
+    expect(parsed.autoStyle).toBe(false)
+    expect(parsed.seed).toBe(123)
+    expect(parsed.theme).toBeUndefined()
+    expect(parsed.themeTokens).toBeUndefined()
+  })
   })
 
   it('autoStyle=true omits theme & tokens in query and decode drops them', () => {

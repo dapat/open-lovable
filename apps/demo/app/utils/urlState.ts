@@ -17,6 +17,7 @@ export interface UIState {
   theme?: ThemeName
   themeTokens?: ThemeTokens
   autoStyle?: boolean
+  styleMode?: 'auto' | 'explicit' | 'seeded'
   variationStrategy?: VariationStrategy
 }
 
@@ -36,15 +37,18 @@ export function encodeStateToQuery(state: UIState): string {
     sp.set('seed', String(state.seed))
   }
 
-  const auto = !!state.autoStyle
+  const mode = state.styleMode ?? (state.autoStyle ? 'auto' : 'explicit')
+  const auto = mode === 'auto'
   if (auto) {
     sp.set('autoStyle', '1')
+    sp.set('styleMode', 'auto')
   } else if (state.autoStyle === false) {
     sp.set('autoStyle', '0')
+    sp.set('styleMode', mode)
   }
 
   // Only include theme/tokens when not in auto style mode
-  if (!auto) {
+  if (!auto && mode !== 'seeded') {
     if (state.theme) sp.set('theme', state.theme)
     if (state.themeTokens?.accent) sp.set('accent', state.themeTokens.accent)
     if (state.themeTokens?.radius) sp.set('radius', state.themeTokens.radius)
@@ -90,6 +94,12 @@ export function parseQueryToState(qs: string | URLSearchParams): UIState {
   const autoStyle = getBool('autoStyle')
   if (typeof autoStyle !== 'undefined') state.autoStyle = autoStyle
 
+  const styleMode = (sp.get('styleMode') as 'auto' | 'explicit' | 'seeded' | null) || null
+  if (styleMode) state.styleMode = styleMode
+  if (!styleMode && typeof state.autoStyle === 'boolean') {
+    state.styleMode = state.autoStyle ? 'auto' : 'explicit'
+  }
+
   const theme = sp.get('theme') as ThemeName | null
   const accent = sp.get('accent') ?? undefined
   const radius = sp.get('radius') ?? undefined
@@ -98,8 +108,8 @@ export function parseQueryToState(qs: string | URLSearchParams): UIState {
   const variationStrategy = sp.get('variationStrategy') as VariationStrategy | null
   if (variationStrategy) state.variationStrategy = variationStrategy
 
-  // If autoStyle=true, ignore any explicit theme/tokens from the URL
-  const allowExplicit = !(autoStyle === true)
+  // If autoStyle=true OR styleMode=seeded, ignore explicit theme/tokens (frontend will derive)
+  const allowExplicit = !(autoStyle === true || styleMode === 'seeded')
 
   if (allowExplicit) {
     if (theme) state.theme = theme

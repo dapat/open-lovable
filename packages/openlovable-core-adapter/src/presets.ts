@@ -15,6 +15,8 @@ export interface ThemePreset {
   }
 }
 
+export const PRESETS_VERSION = 1
+
 export const PRESETS: ThemePreset[] = [
   {
     id: 'minimal',
@@ -61,13 +63,6 @@ export const PRESETS: ThemePreset[] = [
   {
     id: 'neon-glass',
     label: 'Neon Glass',
-    description: 'Neon cyan accent, glassy cards',
-    theme: 'cyber',
-    themeTokens: { accent: '#06b6d4', radius: '12px', font: 'inter' },
-  },
-  {
-    id: 'test-test',
-    label: 'Test',
     description: 'Neon cyan accent, glassy cards',
     theme: 'cyber',
     themeTokens: { accent: '#06b6d4', radius: '12px', font: 'inter' },

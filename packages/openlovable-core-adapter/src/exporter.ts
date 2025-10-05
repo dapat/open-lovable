@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
 import { PageSpec } from './spec'
+import type { ThemeName } from './presets'
 
 const nextJsTemplate = `import React from "react"
 
@@ -152,21 +153,29 @@ const nextJsComponent = `export default function LandingPage({ spec }: { spec: P
 }
 `
 
-const readmeTemplate = (seed?: number, theme?: string, tokens?: { accent?: string; radius?: string; font?: string }) => `# Prompt-to-UI Export
+const readmeTemplate = (
+  seed?: number,
+  theme?: string,
+  tokens?: { accent?: string; radius?: string; font?: string },
+  variationStrategy?: 'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | 'auto',
+  styleMode?: 'auto' | 'explicit' | 'seeded',
+  chosenTheme?: ThemeName | string,
+  presetsVersion?: number
+) => `# Prompt-to-UI Export
 
-This ZIP contains:
-- \`page.html\`           — Static HTML preview
-- \`page.json\`           — Spec used to generate the page
-- \`nextjs-page.tsx\`     — React component for Next.js
-- \`README.md\`           — This file
+This zip contains your generated HTML and the original spec for reproducibility.
 
 ## Reproducibility
-Seed: ${typeof seed === 'number' ? seed : '(not provided)'}
-Theme: ${theme ?? '(not provided)'}
-Theme Tokens:
-  - accent: ${tokens?.accent ?? '(n/a)'}
+Seed: ${seed ?? '(none)'}
+Style Mode: ${styleMode ?? '(unspecified)'}
+Chosen Theme: ${chosenTheme ?? '(none)'}
+Presets Version: ${typeof presetsVersion === 'number' ? presetsVersion : '(n/a)'}
+Theme: ${theme ?? '(none)'}
+Tokens: ${tokens ? JSON.stringify(tokens) : '(none)'}
   - radius: ${tokens?.radius ?? '(n/a)'}
   - font:   ${tokens?.font ?? '(n/a)'}
+
+Variation Strategy: ${variationStrategy ?? '(auto/seed-based)'}
 
 ## Quick Start (Next.js App Router)
 1. Copy \`nextjs-page.tsx\`  to \`app/landing/page.tsx\`
@@ -181,18 +190,34 @@ export async function buildExportZip({
   seed,
   theme,
   themeTokens,
+  variationStrategy,
+  styleMode,
+  chosenTheme,
+  presetsVersion,
 }: {
   spec: PageSpec
   html: string
   seed?: number
   theme?: 'minimal' | 'playful' | 'elegant' | 'cyber'
   themeTokens?: { accent?: string; radius?: string; font?: 'system' | 'inter' | 'serif' }
+  variationStrategy?: 'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | 'auto'
+  styleMode?: 'auto' | 'explicit' | 'seeded'
+  chosenTheme?: ThemeName
+  presetsVersion?: number
 }): Promise<Buffer> {
   const zip = new JSZip()
   zip.file('page.html', html)
   zip.file('page.json', JSON.stringify(spec, null, 2))
   const component = `import React from "react"\n\n${nextJsTemplate}\n\n${nextJsComponent}`
   zip.file('nextjs-page.tsx', component)
-  zip.file('README.md', readmeTemplate(seed, theme ?? (spec as any).theme, themeTokens))
+  zip.file('README.md', readmeTemplate(
+    seed,
+    theme ?? (spec as any).theme,
+    themeTokens,
+    variationStrategy,
+    styleMode,
+    chosenTheme ?? ((spec as any).theme as ThemeName | undefined),
+    presetsVersion
+  ))
   return await zip.generateAsync({ type: 'nodebuffer' })
 }
