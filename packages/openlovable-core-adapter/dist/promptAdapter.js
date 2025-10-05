@@ -1,0 +1,127 @@
+import { renderLegacyHTML } from './render';
+import { renderThemedHTML } from './renderThemed';
+/**
+ * Stub LLM adapter: map any prompt to a deterministic PageSpec.
+ * Later, replace this with a real LLM call.
+ */
+export async function promptToSpec(prompt) {
+    // Naive, deterministic mapping for demo only
+    const wantsKids = /kids|เด็ก/i.test(prompt);
+    const wantsTestimonials = /testimonials?/i.test(prompt);
+    const wantsPricing = /pricing|price|plan/i.test(prompt);
+    const wantsFaq = /faq|questions?/i.test(prompt);
+    const includeAll = !(wantsTestimonials || wantsPricing || wantsFaq);
+    const title = wantsKids ? 'AI Math for Kids' : 'AI Product Landing';
+    const subtitle = 'Generated from a single prompt using the PageSpec adapter';
+    const spec = {
+        title,
+        subtitle,
+        accent: '#3b82f6',
+        hero: {
+            headline: wantsKids ? 'Make Math Fun!' : 'Make It Real in Seconds',
+            subheadline: wantsKids
+                ? 'Interactive exercises for elementary school students'
+                : 'Type a prompt → get a full landing page preview',
+            ctaText: 'Get Started',
+        },
+        features: {
+            title: wantsKids ? 'Why choose us?' : 'Highlights',
+            items: wantsKids
+                ? [
+                    { label: 'Interactive exercises', icon: '/icons/check.svg' },
+                    { label: 'Progress tracking', icon: '/icons/check.svg' },
+                    { label: 'Designed for kids', icon: '/icons/check.svg' },
+                ]
+                : [
+                    { label: 'Prompt → Spec → HTML', icon: '/icons/check.svg' },
+                    { label: 'Deterministic preview', icon: '/icons/check.svg' },
+                    { label: 'Export-ready output', icon: '/icons/check.svg' },
+                ],
+        },
+        cta: {
+            headline: wantsKids ? 'Start your free trial today!' : 'Ready to ship your page?',
+            ctaText: wantsKids ? 'Sign Up' : 'Export Now',
+        },
+        footer: { smallprint: '© 2025 Flowgami – Demo only' },
+    };
+    if (wantsTestimonials || includeAll) {
+        ;
+        spec.testimonials = {
+            title: 'Loved by teams',
+            items: [
+                { quote: 'It just works.', author: 'Jane', avatar: '/avatars/jane.png' },
+                { quote: 'Boosted our speed 10x.', author: 'Alex' },
+            ],
+        };
+    }
+    if (wantsPricing || includeAll) {
+        ;
+        spec.pricing = {
+            title: 'Simple pricing',
+            plans: [
+                { name: 'Starter', price: '$9/mo', features: ['1 project', 'Email support'] },
+                { name: 'Pro', price: '$29/mo', features: ['Unlimited projects', 'Priority support'] },
+            ],
+        };
+    }
+    if (wantsFaq || includeAll) {
+        ;
+        spec.faq = {
+            title: 'FAQ',
+            items: [
+                { q: 'Can I export?', a: 'Yes, as HTML or Next.js.' },
+                { q: 'Is there a free plan?', a: 'Yes, with basic features.' },
+            ],
+        };
+    }
+    return spec;
+}
+export async function generateFromPrompt(prompt, seed, theme, themeTokens) {
+    const spec = await promptToSpec(prompt);
+    const actualSeed = typeof seed === 'number' && Number.isFinite(seed) ? seed : Math.floor(Math.random() * 100000);
+    const hasSeed = typeof seed === 'number' && Number.isFinite(seed);
+    if (theme) {
+        ;
+        spec.theme = theme;
+    }
+    if (themeTokens) {
+        ;
+        spec.themeTokens = themeTokens;
+    }
+    if (hasSeed) {
+        try {
+            if (actualSeed % 2 === 0 && spec.features?.items) {
+                ;
+                spec.features.items = [...spec.features.items].reverse();
+            }
+            if (actualSeed % 3 === 0 && spec.pricing?.plans) {
+                ;
+                spec.pricing.plans = seededShuffle([...spec.pricing.plans], actualSeed);
+            }
+        }
+        catch { }
+    }
+    // Use themed renderer only when theme is explicitly provided; otherwise keep legacy for golden compatibility
+    const html = theme ? renderThemedHTML(spec) : renderLegacyHTML(spec);
+    return { spec, html, seed: actualSeed };
+}
+// --- deterministic PRNG (mulberry32)
+export function mulberry32(seed) {
+    let t = seed >>> 0;
+    return function () {
+        t += 0x6d2b79f5;
+        let r = Math.imul(t ^ (t >>> 15), 1 | t);
+        r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+        return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+    };
+}
+// --- seeded shuffle (Fisher–Yates)
+export function seededShuffle(arr, seed) {
+    const rand = mulberry32(seed);
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+        const j = Math.floor(rand() * (i + 1));
+        [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+}
