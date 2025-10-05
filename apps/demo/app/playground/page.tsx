@@ -1,7 +1,8 @@
 "use client"
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { PRESETS } from '@flowgami/openlovable-core-adapter'
+import { buildShareURL, parseQueryToState } from '../utils/urlState'
 
 const THEMES = ['minimal', 'playful', 'elegant', 'cyber'] as const
 type Theme = typeof THEMES[number]
@@ -24,6 +25,8 @@ export default function PlaygroundPage() {
   const [autoStyle, setAutoStyle] = useState<boolean>(true)
   const [chosenTheme, setChosenTheme] = useState<string | undefined>(undefined)
   const [themeSource, setThemeSource] = useState<'prompt' | 'explicit' | 'none' | undefined>(undefined)
+  const [variationStrategy, setVariationStrategy] = useState<'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | undefined>(undefined)
+  const [appliedVariation, setAppliedVariation] = useState<'none' | 'reverse-features' | 'shuffle-pricing' | 'both' | 'auto' | undefined>(undefined)
 
   function handleToggle(keyword: string) {
     if (!prompt.toLowerCase().includes(keyword.toLowerCase())) {
@@ -83,6 +86,9 @@ export default function PlaygroundPage() {
         payload.theme = theme
         payload.themeTokens = { accent, radius: `${radius}px`, font }
       }
+      if (variationStrategy) {
+        payload.variationStrategy = variationStrategy
+      }
       const res = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -102,6 +108,7 @@ export default function PlaygroundPage() {
       if (typeof data?.seed === 'number') setSeed(data.seed)
       setChosenTheme(data?.chosenTheme)
       setThemeSource(data?.themeSource)
+      setAppliedVariation(data?.variationStrategy)
     } catch (e: any) {
       setHtml('')
       setError(String(e.message || e))
@@ -124,6 +131,9 @@ export default function PlaygroundPage() {
       if (!autoStyle) {
         exportPayload.theme = theme
         exportPayload.themeTokens = { accent, radius: `${radius}px`, font }
+      }
+      if (variationStrategy) {
+        exportPayload.variationStrategy = variationStrategy
       }
       const res = await fetch('/api/export', {
         method: 'POST',
@@ -155,9 +165,29 @@ export default function PlaygroundPage() {
     }
   }
 
+  // Hydrate from URL params once
+  const hydratedRef = useRef(false)
   useEffect(() => {
-    // Auto-generate once on mount with default prompt
-    handleGenerate()
+    if (hydratedRef.current) return
+    try {
+      const st = parseQueryToState(window.location.search)
+      if (typeof st.prompt === 'string') setPrompt(st.prompt)
+      if (typeof st.seed === 'number') setSeed(st.seed)
+      if (typeof st.autoStyle === 'boolean') setAutoStyle(st.autoStyle)
+      if (st.theme) setTheme(st.theme as any)
+      if (st.themeTokens?.accent) setAccent(st.themeTokens.accent)
+      if (st.themeTokens?.radius) {
+        const v = String(st.themeTokens.radius)
+        const n = Number(v.endsWith('px') ? v.slice(0, -2) : v)
+        if (Number.isFinite(n)) setRadius(n)
+      }
+      if (st.themeTokens?.font) setFont(st.themeTokens.font as any)
+      if (st.variationStrategy) setVariationStrategy(st.variationStrategy)
+    } catch {}
+    hydratedRef.current = true
+    // After hydrating initial state, trigger a generate
+    // Defer to next tick so state setters above take effect
+    setTimeout(() => handleGenerate(), 0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -223,6 +253,21 @@ export default function PlaygroundPage() {
                   {t.charAt(0).toUpperCase() + t.slice(1)}
                 </option>
               ))}
+            </select>
+          </div>
+          {/* Variation Strategy */}
+          <div className="min-w-48">
+            <label className="block text-sm mb-1 font-medium">Variation Strategy</label>
+            <select
+              className="w-full p-2 border rounded"
+              value={variationStrategy ?? 'auto'}
+              onChange={(e) => setVariationStrategy(e.target.value === 'auto' ? undefined : (e.target.value as any))}
+            >
+              <option value="auto">Auto (seed-based)</option>
+              <option value="none">None</option>
+              <option value="reverse-features">Reverse features</option>
+              <option value="shuffle-pricing">Shuffle pricing</option>
+              <option value="both">Both</option>
             </select>
           </div>
           {/* Auto style from prompt toggle */}
@@ -335,6 +380,30 @@ export default function PlaygroundPage() {
           Regenerate
         </button>
         <button
+          onClick={async () => {
+            try {
+              const url = buildShareURL(`${window.location.origin}/playground`, {
+                prompt,
+                seed,
+                autoStyle,
+                theme: autoStyle ? undefined : (theme as any),
+                themeTokens: autoStyle ? undefined : { accent, radius: `${radius}px`, font },
+                variationStrategy,
+              })
+              await navigator.clipboard.writeText(url)
+              // lightweight toast
+              console.log('Share link copied:', url)
+              alert('Link copied!')
+            } catch (e) {
+              console.error(e)
+              alert('Failed to copy link')
+            }
+          }}
+          className="mt-2 ml-2 px-4 py-2 bg-slate-700 text-white rounded"
+        >
+          Share
+        </button>
+        <button
           onClick={handleExport}
           disabled={exporting}
           className="mt-2 ml-2 px-4 py-2 bg-emerald-600 text-white rounded disabled:opacity-60"
@@ -348,6 +417,7 @@ export default function PlaygroundPage() {
           <p className="text-xs text-gray-600 mt-1">
             Style: <span className="font-medium">{chosenTheme ?? '(none)'}</span>
             {themeSource ? <><span className="mx-1">•</span> source: {themeSource}</> : null}
+            {appliedVariation ? <><span className="mx-1">•</span> variation: {appliedVariation}</> : null}
           </p>
         )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
