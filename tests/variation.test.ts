@@ -21,6 +21,65 @@ describe('PRNG and seeded shuffle (deterministic)', () => {
     }
   })
 
+// T40 – Variation Strategies (explicit)
+describe('Variation strategies (explicit)', () => {
+  it('reverse-features should reverse features items', async () => {
+    const { spec, variationStrategy } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'reverse-features') as any
+    expect(variationStrategy).toBe('reverse-features')
+    const labels = (spec as any).features.items.map((i: any) => (typeof i === 'string' ? i : i.label))
+    expect(labels).toEqual([...labels].reverse())
+  })
+
+  it('shuffle-pricing should shuffle pricing plans deterministically for same seed', async () => {
+    const { spec, variationStrategy } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'shuffle-pricing') as any
+    expect(variationStrategy).toBe('shuffle-pricing')
+    const names1 = (spec as any).pricing.plans.map((p: any) => p.name)
+    const { spec: spec2 } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'shuffle-pricing') as any
+    const names2 = (spec2 as any).pricing.plans.map((p: any) => p.name)
+    expect(names1).toEqual(names2)
+  })
+
+  it('both should reverse features and shuffle pricing', async () => {
+    const { spec, variationStrategy } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'both') as any
+    expect(variationStrategy).toBe('both')
+    const labels = (spec as any).features.items.map((i: any) => (typeof i === 'string' ? i : i.label))
+    const { spec: base } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'none') as any
+    const baseLabels = (base as any).features.items.map((i: any) => (typeof i === 'string' ? i : i.label))
+    expect(labels).toEqual([...baseLabels].reverse())
+    const names = (spec as any).pricing.plans.map((p: any) => p.name)
+    const baseNames = (base as any).pricing.plans.map((p: any) => p.name)
+    expect(names).not.toEqual(baseNames)
+  })
+
+  it('none should keep baseline unchanged', async () => {
+    const { spec, variationStrategy } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'none') as any
+    expect(variationStrategy).toBe('none')
+    const { spec: base } = await generateFromPrompt('Landing page', 123, 'minimal', undefined, false, 'none') as any
+    expect((spec as any).features.items).toEqual((base as any).features.items)
+    expect((spec as any).pricing.plans).toEqual((base as any).pricing.plans)
+  })
+})
+
+describe('API variationStrategy passthrough and README', () => {
+  it('GET /api/generate with variationStrategy=reverse-features returns reversed features and reports strategy', async () => {
+    const req: any = { url: `http://localhost/api/generate?prompt=${encodeURIComponent('Landing page')}&seed=42&variationStrategy=reverse-features` }
+    const res = await generateGET(req)
+    const data = await (res as Response).json()
+    expect(data.variationStrategy).toBe('reverse-features')
+    const labels = (data.spec.features.items as any[]).map((i: any) => (typeof i === 'string' ? i : i.label))
+    expect(labels).toEqual([...labels].reverse())
+  })
+
+  it('GET /api/export with variationStrategy=both writes strategy into README', async () => {
+    const url = `http://localhost/api/export?prompt=${encodeURIComponent('Landing page')}&seed=42&variationStrategy=both`
+    const res = await exportGET({ url } as any)
+    const buf = Buffer.from(await (res as Response).arrayBuffer())
+    const zip = await loadZipAsync(buf)
+    const readme = await zip.file('README.md')!.async('string')
+    expect(readme).toMatch(/Variation Strategy:\s*both/)
+  })
+})
+
   it('mulberry32(seedA) != mulberry32(seedB) on first value (usually)', () => {
     const a = mulberry32(1)
     const b = mulberry32(2)
